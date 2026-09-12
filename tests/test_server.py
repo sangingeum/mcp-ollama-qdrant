@@ -72,6 +72,39 @@ def test_update_nonexistent_id_error(env):
     assert "not found" in out
 
 
+def test_update_metadata_only_keeps_text(env):
+    fq, _ = env
+    saved = s.save_memory("metadata-only doc", json.dumps({"source": "a"}))
+    pid = saved.split("ID: ")[1].split(",")[0].strip()
+
+    out = s.update_memory(pid, None, json.dumps({"source": "b", "v": 9}))
+    assert "Memory updated" in out
+
+    stored = fq.collections[s.COLLECTION_NAME]["points"][pid]
+    assert stored["text"] == "metadata-only doc"  # text untouched
+    assert stored["source"] == "b"
+    assert stored["v"] == 9
+
+
+def test_update_both_none_error(env):
+    out = s.update_memory("00000000-0000-0000-0000-000000000000")
+    assert out.startswith("Error: nothing to update")
+
+
+def test_delete_nonexistent_id_error(env):
+    out = s.delete_memory("00000000-0000-0000-0000-000000000000")
+    assert "Error: point_id 00000000-0000-0000-0000-000000000000 not found" in out
+
+
+def test_delete_existing_ok(env):
+    fq, _ = env
+    saved = s.save_memory("to be deleted")
+    pid = saved.split("ID: ")[1].split(",")[0].strip()
+    out = s.delete_memory(pid)
+    assert "Memory deleted" in out
+    assert pid not in fq.collections[s.COLLECTION_NAME]["points"]
+
+
 def test_update_nonexistent_collection_error(env):
     out = s.update_memory("abc", "nope", collection="missing_coll")
     assert "Update failed" in out

@@ -153,16 +153,20 @@ def search_memory(query: str, limit: int = 3, filter: str = "", collection: str 
 
 
 @mcp.tool()
-def update_memory(point_id: str, text: str, metadata: str = "", collection: str = "") -> str:
-    """Update an existing memory (point) in place: re-embed and overwrite under the same ID.
+def update_memory(point_id: str, text: str | None = None, metadata: str = "", collection: str = "") -> str:
+    """Update an existing memory (point) in place under the same ID.
 
     If point_id does not exist, an error is returned (existence is checked
-    first). When metadata is given, the payload metadata is replaced
-    entirely; when left empty ("") the existing metadata is kept. text is
-    always replaced with the new value.
+    first). When text is given, it is re-embedded and overwrites the stored
+    text; when text is None the existing text and vector are kept. When
+    metadata is given, the payload metadata is replaced entirely; when left
+    empty ("") the existing metadata is kept. Passing both text=None and an
+    empty metadata is an error (nothing to update).
     If collection is given, the update happens there.
     """
     try:
+        if (text is None or not text.strip()) and not (metadata and metadata.strip()):
+            return "Error: nothing to update — provide new text, new metadata, or both."
         name = collection if collection and collection.strip() else COLLECTION_NAME
         if not qdrant.collection_exists(name):
             return f"Update failed: collection {name!r} does not exist."
@@ -176,8 +180,14 @@ def update_memory(point_id: str, text: str, metadata: str = "", collection: str 
         else:
             warning = None
             payload = dict(point.payload or {})
-        vector = embed(text)
+        if text is None or not text.strip():
+            # Metadata-only update: keep the existing text and vector, replace
+            # the payload without re-embedding.
+            payload["text"] = (point.payload or {}).get("text", "") if metadata and metadata.strip() else payload["text"]
+            qdrant.set_payload(collection_name=name, payload=payload, points=[point_id])
+            return _append_warning(f"Memory updated (ID: {point_id}, collection: {name})", warning)
         payload["text"] = text
+        vector = embed(text)
         qdrant.upsert(
             collection_name=name,
             points=[PointStruct(id=point_id, vector=vector, payload=payload)],
@@ -192,11 +202,17 @@ def update_memory(point_id: str, text: str, metadata: str = "", collection: str 
 def delete_memory(point_id: str, collection: str = "") -> str:
     """Delete a stored memory (point) from the vector DB by ID.
 
-    If collection is given, the deletion happens there (default: the
+    If point_id does not exist, an error is returned (existence is checked
+    first). If collection is given, the deletion happens there (default: the
     server-configured collection).
     """
     try:
         name = collection if collection and collection.strip() else COLLECTION_NAME
+        if not qdrant.collection_exists(name):
+            return f"Delete failed: collection {name!r} does not exist."
+        existing = qdrant.retrieve(collection_name=name, ids=[point_id], with_payload=False)
+        if not existing:
+            return f"Error: point_id {point_id} not found."
         qdrant.delete(collection_name=name, points_selector=[point_id])
         return f"Memory deleted (ID: {point_id}, collection: {name})"
     except Exception as exc:

@@ -72,6 +72,25 @@ upd3 = s.update_memory("00000000-0000-0000-0000-000000000000", "Update attempt o
 print(upd3)
 assert "Update failed" in upd3
 
+# update_memory: metadata-only update (text=None) — text and vector untouched
+meta_only = s.update_memory(first_id, None, json.dumps({"source": "meta-only", "v": 9}))
+print("META-ONLY UPDATE:", meta_only)
+assert "Memory updated" in meta_only
+pts3 = s.qdrant.retrieve(collection_name=s.COLLECTION_NAME, ids=[first_id], with_payload=True)
+assert pts3[0].payload["text"].startswith("If the DB connection fails, retry 7 times"), "text must be untouched by metadata-only update"
+assert pts3[0].payload["source"] == "meta-only"
+assert pts3[0].payload["v"] == 9
+
+# update_memory: both text and metadata missing → error
+no_op = s.update_memory(first_id)
+print("NO-OP UPDATE:", no_op)
+assert no_op.startswith("Error: nothing to update")
+
+# delete_memory: nonexistent ID → error
+del_missing = s.delete_memory("00000000-0000-0000-0000-000000000000")
+print("DELETE MISSING:", del_missing)
+assert "not found" in del_missing
+
 # collection param: save into ad-hoc collection (created on save)
 cs = s.save_memory("Secondary collection save test: index rebuild runs overnight.", json.dumps({"scope":"coll2"}), collection=COLL2)
 print(cs)

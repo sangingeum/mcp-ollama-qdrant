@@ -103,6 +103,12 @@ class FakeQdrant:
             if str(pid) in coll["points"]
         ]
 
+    def set_payload(self, collection_name, payload, points, **kw):
+        coll = self.collections.get(collection_name, {"points": {}})
+        for pid in points:
+            if str(pid) in coll["points"]:
+                coll["points"][str(pid)].update(dict(payload or {}))
+
     def delete(self, collection_name, points_selector, **kw):
         coll = self.collections.get(collection_name, {"points": {}})
         for pid in points_selector:
