@@ -20,8 +20,8 @@ embedding model).
 ## Requirements
 
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
-- A reachable Ollama instance (default `http://192.168.1.103:11434`)
-- A reachable Qdrant instance (default `http://192.168.1.105:6333`)
+- A reachable Ollama instance (default `http://192.168.X.X:11434`)
+- A reachable Qdrant instance (default `http://192.168.X.X:6333`)
 
 ## Configuration
 
@@ -29,8 +29,8 @@ Settings resolve in order: **CLI flags > environment variables > defaults**.
 
 | Setting | CLI flag | Env var | Default |
 |---|---|---|---|
-| Ollama base URL | `--ollama-url` | `OLLAMA_URL` | `http://192.168.1.103:11434` |
-| Qdrant base URL | `--qdrant-url` | `QDRANT_URL` | `http://192.168.1.105:6333` |
+| Ollama base URL | `--ollama-url` | `OLLAMA_URL` | `http://192.168.X.X:11434` |
+| Qdrant base URL | `--qdrant-url` | `QDRANT_URL` | `http://192.168.X.X:6333` |
 | Embedding model | `--embed-model` | `EMBED_MODEL` | `qwen3-embedding:8b` |
 | Collection name | `--collection` | `COLLECTION_NAME` | `agent_scenarios` |
 
@@ -65,8 +65,8 @@ Add to your client's MCP config (Claude Desktop, Hermes, etc.):
         "run", "mcp-ollama-qdrant"
       ],
       "env": {
-        "OLLAMA_URL": "http://192.168.1.103:11434",
-        "QDRANT_URL": "http://192.168.1.105:6333",
+        "OLLAMA_URL": "http://192.168.X.X:11434",
+        "QDRANT_URL": "http://192.168.X.X:6333",
         "EMBED_MODEL": "qwen3-embedding:8b",
         "COLLECTION_NAME": "agent_scenarios"
       }
