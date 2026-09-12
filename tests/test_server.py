@@ -142,6 +142,60 @@ def test_secondary_collection_created_on_save(env):
 
 
 # ---------------------------------------------------------------------------
+# tolerant metadata/filter types (JSON string OR object)
+# ---------------------------------------------------------------------------
+
+def test_save_metadata_as_dict(env):
+    fq, _ = env
+    out = s.save_memory("dict meta doc", {"source": "obj", "tags": ["t"]})
+    assert "Memory saved" in out
+    pid = out.split("ID: ")[1].split(",")[0].strip()
+    stored = fq.collections[s.COLLECTION_NAME]["points"][pid]
+    assert stored["source"] == "obj"
+    assert stored["tags"] == ["t"]
+
+
+def test_save_memories_metadata_as_dict(env):
+    fq, _ = env
+    out = s.save_memories(["a", "b"], {"src": "batch-obj"})
+    assert out.startswith("Saved 2 memories")
+    ids = out.split("IDs: ")[1].rstrip(")").split(", ")
+    stored = [fq.collections[s.COLLECTION_NAME]["points"][pid] for pid in ids]
+    assert all(p["src"] == "batch-obj" for p in stored)
+
+
+def test_search_filter_as_dict(env):
+    s.save_memory("filtered doc", {"tags": ["only-this"]})
+    out = s.search_memory("filtered doc", filter={"tags": ["only-this"]})
+    assert "filtered doc" in out
+    out2 = s.search_memory("filtered doc", filter={"tags": ["nope"]})
+    assert "No matching memories found." in out2
+
+
+def test_update_metadata_as_dict(env):
+    fq, _ = env
+    saved = s.save_memory("upd dict doc", {"v": 1})
+    pid = saved.split("ID: ")[1].split(",")[0].strip()
+    out = s.update_memory(pid, None, {"v": 2, "src": "obj"})
+    assert "Memory updated" in out
+    stored = fq.collections[s.COLLECTION_NAME]["points"][pid]
+    assert stored["v"] == 2
+    assert stored["text"] == "upd dict doc"  # text untouched
+
+
+def test_update_both_none_error_with_dict(env):
+    out = s.update_memory("00000000-0000-0000-0000-000000000000", None, {})
+    assert out.startswith("Error: nothing to update")
+
+
+def test_json_string_still_accepted_backcompat(env):
+    fq, _ = env
+    out = s.save_memory("string meta", json.dumps({"k": "v"}))
+    pid = out.split("ID: ")[1].split(",")[0].strip()
+    assert fq.collections[s.COLLECTION_NAME]["points"][pid]["k"] == "v"
+
+
+# ---------------------------------------------------------------------------
 # invalid JSON warnings
 # ---------------------------------------------------------------------------
 

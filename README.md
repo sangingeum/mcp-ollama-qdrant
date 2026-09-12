@@ -10,10 +10,10 @@ It exposes six tools over the stdio MCP transport:
 
 | Tool | Description |
 |---|---|
-| `save_memory(text, metadata, collection)` | Embeds `text` via Ollama and upserts it into Qdrant. `metadata` is an optional JSON string stored alongside the vector. Optional `collection` targets a specific collection (created on the fly if missing; empty = server default). |
-| `save_memories(texts, metadata, collection)` | Batch version: embeds a list of texts in one Ollama call and upserts them as a single batch. `metadata` applies to all documents. |
-| `search_memory(query, limit, filter, collection)` | Embeds `query` and returns the `limit` most similar stored memories — each hit includes its point **ID**, similarity **score**, **metadata**, and text, so you can `delete_memory`/`update_memory` straight from search output. Optional `filter` is a payload-filter JSON string (see below). |
-| `update_memory(point_id, text, metadata, collection)` | Re-embeds `text` and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata; a JSON string replaces it. Nonexistent IDs return an error. |
+| `save_memory(text, metadata, collection)` | Embeds `text` via Ollama and upserts it into Qdrant. `metadata` is optional metadata — a JSON object or a JSON string, both accepted — stored alongside the vector. Optional `collection` targets a specific collection (created on the fly if missing; empty = server default). |
+| `save_memories(texts, metadata, collection)` | Batch version: embeds a list of texts in one Ollama call and upserts them as a single batch. `metadata` (object or JSON string) applies to all documents. |
+| `search_memory(query, limit, filter, collection)` | Embeds `query` and returns the `limit` most similar stored memories — each hit includes its point **ID**, similarity **score**, **metadata**, and text, so you can `delete_memory`/`update_memory` straight from search output. Optional `filter` is a payload filter — JSON object or JSON string (see below). |
+| `update_memory(point_id, text, metadata, collection)` | Re-embeds `text` and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata; a JSON object or JSON string replaces it. Nonexistent IDs return an error. |
 | `delete_memory(point_id, collection)` | Deletes the stored memory (point) with the given ID. |
 | `list_collections()` | Lists all existing Qdrant collections. |
 
@@ -22,8 +22,8 @@ the server-configured collection (`--collection` / `COLLECTION_NAME`).
 
 ### Payload filtering
 
-`search_memory` accepts an optional `filter` JSON string built from payload
-fields. List values become a `MatchAny` condition (matches if the payload
+`search_memory` accepts an optional `filter` — a JSON object or a JSON string
+built from payload fields. List values become a `MatchAny` condition (matches if the payload
 field contains **any** of the values), scalar values become exact matches.
 Multiple conditions are AND-ed together:
 

@@ -21,10 +21,10 @@ embedded by Ollama (`qwen3-embedding:8b`, 4096-dim) and stored in Qdrant
 
 | Tool | Params | Returns |
 |---|---|---|
-| `save_memory` | `text: str`, `metadata: str = "{}"` (JSON string), `collection: str = ""` | Confirmation with new point UUID + collection, e.g. `Memory saved (ID: <uuid>, collection: <name>)`. The saved text is also stored in the payload under `text`. |
-| `save_memories` | `texts: list[str]`, `metadata: str` (applied to all), `collection: str = ""` | Count + comma-separated UUIDs. Single Ollama batch call, single upsert. |
-| `search_memory` | `query: str`, `limit: int = 3`, `filter: str = ""` (payload-filter JSON), `collection: str = ""` | Lines like `- [ID: <uuid>] [score: 0.8421] metadata: {"tags": [...]} | content: <text>`, best first. **Every hit includes the point ID and metadata** — enough to call `delete_memory`/`update_memory` directly from search output. Empty → `No matching memories found.` |
-| `update_memory` | `point_id: str`, `text: str \| None = None`, `metadata: str = ""`, `collection: str = ""` | Re-embeds the new text and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata and replaces only the text; a JSON string replaces the whole payload metadata. `text=None` (or blank) with a `metadata` JSON string updates ONLY metadata — the stored text and vector are kept, no re-embedding (no Ollama call). Passing neither text nor metadata → `Error: nothing to update…`. Nonexistent ID → `Update failed: point_id … not found.` (existence verified via retrieve first). |
+| `save_memory` | `text: str`, `metadata: str \| object = "{}"`, `collection: str = ""` | Confirmation with new point UUID + collection, e.g. `Memory saved (ID: <uuid>, collection: <name>)`. The saved text is also stored in the payload under `text`. |
+| `save_memories` | `texts: list[str]`, `metadata: str \| object` (applied to all), `collection: str = ""` | Count + comma-separated UUIDs. Single Ollama batch call, single upsert. |
+| `search_memory` | `query: str`, `limit: int = 3`, `filter: str \| object = ""` (payload filter), `collection: str = ""` | Lines like `- [ID: <uuid>] [score: 0.8421] metadata: {"tags": [...]} | content: <text>`, best first. **Every hit includes the point ID and metadata** — enough to call `delete_memory`/`update_memory` directly from search output. Empty → `No matching memories found.` |
+| `update_memory` | `point_id: str`, `text: str \| None = None`, `metadata: str \| object = ""`, `collection: str = ""` | Re-embeds the new text and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata and replaces only the text; a JSON object or string replaces the whole payload metadata. `text=None` (or blank) with a `metadata` value updates ONLY metadata — the stored text and vector are kept, no re-embedding (no Ollama call). Passing neither text nor metadata → `Error: nothing to update…`. Nonexistent ID → `Update failed: point_id … not found.` (existence verified via retrieve first). |
 | `delete_memory` | `point_id: str` (the UUID from save/search), `collection: str = ""` | Confirmation `Memory deleted (ID: …)`. Deletes the point permanently. Nonexistent ID → `Error: point_id … not found` (existence verified via retrieve first, no false success). |
 | `list_collections` | — | Collection names (comma-separated). |
 
@@ -53,8 +53,8 @@ Empty string (default) uses the server-configured collection
 
 ## Payload filtering (search_memory `filter`)
 
-JSON string `{"field": value}`. List value → MatchAny (field contains any
-value); scalar → exact match; multiple fields AND-ed together.
+JSON object or JSON string `{"field": value}`. List value → MatchAny (field
+contains any value); scalar → exact match; multiple fields AND-ed together.
 Invalid JSON → filter is ignored and a warning line is appended to
 the returned string (e.g. `Warning: failed to parse filter JSON; searching
 without a filter`),
@@ -85,10 +85,11 @@ model). Run via `uv run mcp-ollama-qdrant` from the repo directory.
   collection, or revert EMBED_MODEL). You cannot mix models in one
   collection. Same model change also requires re-embedding existing
   memories — old vectors stay valid only under the original model.
-- **metadata must be a JSON string**, not an object. Pass `'{"tags":["a"]}'`.
-  Invalid JSON is stored as empty metadata **and a warning line is returned
-  in the tool's output** — check it if a filter unexpectedly matches
-  nothing. Non-dict JSON also becomes empty metadata (own warning line).
+- **metadata and filter accept BOTH a JSON object and a JSON string.** Pass
+  an object or a JSON string — both work. Invalid JSON strings are stored as
+  empty metadata **and a warning line is returned in the tool's output** —
+  check it if a filter unexpectedly matches nothing. Non-dict JSON also
+  becomes empty metadata (own warning line).
 - **update_memory replaces the whole payload metadata when given** — pass
   `metadata=""` (default) to keep existing metadata and change only text.
   The text field is always replaced.

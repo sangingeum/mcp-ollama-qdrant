@@ -53,14 +53,14 @@ def _apply_collection(collection: str | None) -> str:
 
 
 @mcp.tool()
-def save_memory(text: str, metadata: str = "{}", collection: str = "") -> str:
+def save_memory(text: str, metadata: str | dict[str, Any] = "{}", collection: str = "") -> str:
     """Save a new document or scenario outcome into the vector DB.
 
-    metadata is a JSON string (e.g. '{"source": "doc1", "tags": ["a"]}') —
-    on parse failure an empty dict is stored instead and a warning is
-    returned alongside the result. If collection is given, the memory is
-    stored there (created automatically if missing; default: the
-    server-configured collection).
+    metadata may be a JSON string (e.g. '{"source": "doc1", "tags": ["a"]}')
+    or a JSON object — both are accepted. On parse failure an empty dict is
+    stored instead and a warning is returned alongside the result. If
+    collection is given, the memory is stored there (created automatically
+    if missing; default: the server-configured collection).
     """
     meta_dict, warning = parse_metadata(metadata)
     try:
@@ -79,12 +79,13 @@ def save_memory(text: str, metadata: str = "{}", collection: str = "") -> str:
 
 
 @mcp.tool()
-def save_memories(texts: list[str], metadata: str = "{}", collection: str = "") -> str:
+def save_memories(texts: list[str], metadata: str | dict[str, Any] = "{}", collection: str = "") -> str:
     """Save multiple documents into the vector DB in one batch.
 
     All texts are embedded in a single Ollama call and upserted together.
-    metadata is a JSON string applied to every document. If collection is
-    given, the memories are stored there (created automatically if missing).
+    metadata (JSON string or object) is applied to every document. If
+    collection is given, the memories are stored there (created
+    automatically if missing).
     """
     meta_dict, warning = parse_metadata(metadata)
     if not texts:
@@ -109,10 +110,10 @@ def save_memories(texts: list[str], metadata: str = "{}", collection: str = "") 
 
 
 @mcp.tool()
-def search_memory(query: str, limit: int = 3, filter: str = "", collection: str = "") -> str:
+def search_memory(query: str, limit: int = 3, filter: str | dict[str, Any] = "", collection: str = "") -> str:
     """Search the vector DB for past documents/scenarios semantically similar to a query.
 
-    filter is an optional payload-filter JSON string (e.g.
+    filter is an optional payload filter, as a JSON string or object (e.g.
     '{"tags": ["x"]}' — only items whose tags field contains "x").
     List values use MatchAny, scalars use exact match, and multiple
     conditions are AND-ed. On parse failure the search runs without a filter
@@ -152,20 +153,28 @@ def search_memory(query: str, limit: int = 3, filter: str = "", collection: str 
     return _append_warning("\n".join(out), warning)
 
 
+def _has_metadata(metadata: str | dict[str, Any]) -> bool:
+    """True if metadata carries content (non-empty dict or non-blank string)."""
+    if isinstance(metadata, dict):
+        return bool(metadata)
+    return bool(metadata and metadata.strip())
+
+
 @mcp.tool()
-def update_memory(point_id: str, text: str | None = None, metadata: str = "", collection: str = "") -> str:
+def update_memory(point_id: str, text: str | None = None, metadata: str | dict[str, Any] = "", collection: str = "") -> str:
     """Update an existing memory (point) in place under the same ID.
 
     If point_id does not exist, an error is returned (existence is checked
     first). When text is given, it is re-embedded and overwrites the stored
     text; when text is None the existing text and vector are kept. When
-    metadata is given, the payload metadata is replaced entirely; when left
-    empty ("") the existing metadata is kept. Passing both text=None and an
-    empty metadata is an error (nothing to update).
+    metadata is given (JSON string or object), the payload metadata is
+    replaced entirely; when left empty ("") the existing metadata is kept.
+    Passing both text=None and an empty metadata is an error (nothing to
+    update).
     If collection is given, the update happens there.
     """
     try:
-        if (text is None or not text.strip()) and not (metadata and metadata.strip()):
+        if (text is None or not text.strip()) and not _has_metadata(metadata):
             return "Error: nothing to update — provide new text, new metadata, or both."
         name = collection if collection and collection.strip() else COLLECTION_NAME
         if not qdrant.collection_exists(name):
@@ -174,7 +183,7 @@ def update_memory(point_id: str, text: str | None = None, metadata: str = "", co
         if not existing:
             return f"Update failed: point_id {point_id} not found."
         point = existing[0]
-        if metadata and metadata.strip():
+        if _has_metadata(metadata):
             meta_dict, warning = parse_metadata(metadata)
             payload: dict[str, Any] = dict(meta_dict)
         else:
@@ -183,7 +192,7 @@ def update_memory(point_id: str, text: str | None = None, metadata: str = "", co
         if text is None or not text.strip():
             # Metadata-only update: keep the existing text and vector, replace
             # the payload without re-embedding.
-            payload["text"] = (point.payload or {}).get("text", "") if metadata and metadata.strip() else payload["text"]
+            payload["text"] = (point.payload or {}).get("text", "") if _has_metadata(metadata) else payload["text"]
             qdrant.set_payload(collection_name=name, payload=payload, points=[point_id])
             return _append_warning(f"Memory updated (ID: {point_id}, collection: {name})", warning)
         payload["text"] = text

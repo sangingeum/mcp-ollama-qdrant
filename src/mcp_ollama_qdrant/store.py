@@ -102,13 +102,18 @@ WARN_INVALID_METADATA_TYPE = "Warning: metadata is not a JSON object (dict); sav
 WARN_INVALID_FILTER = "Warning: failed to parse filter JSON; searching without a filter"
 
 
-def parse_metadata(metadata: str | None) -> tuple[dict[str, Any], str | None]:
-    """Parse a JSON metadata string.
+def parse_metadata(metadata: str | dict[str, Any] | None) -> tuple[dict[str, Any], str | None]:
+    """Parse metadata, tolerating both a JSON string and an already-parsed dict.
 
-    Returns ``(dict, warning)``; invalid input yields an empty dict plus a
-    warning line to surface in the tool's return value.
+    Agents frequently send metadata as a JSON object instead of a string;
+    both are accepted. Returns ``(dict, warning)``; invalid input yields an
+    empty dict plus a warning line to surface in the tool's return value.
     """
-    if not metadata or not metadata.strip():
+    if metadata is None:
+        return {}, None
+    if isinstance(metadata, dict):
+        return dict(metadata), None
+    if not isinstance(metadata, str) or not metadata.strip():
         return {}, None
     try:
         parsed = json.loads(metadata)
@@ -120,8 +125,8 @@ def parse_metadata(metadata: str | None) -> tuple[dict[str, Any], str | None]:
     return parsed, None
 
 
-def build_filter(filter_json: str | None) -> tuple[Filter | None, str | None]:
-    """Build a Qdrant :class:`Filter` from a JSON string.
+def build_filter(filter_json: str | dict[str, Any] | None) -> tuple[Filter | None, str | None]:
+    """Build a Qdrant :class:`Filter` from a JSON string or an already-parsed dict.
 
     Accepts ``{"field": value}`` pairs. A list value becomes ``MatchAny``
     (field matches any of the values), a scalar becomes ``MatchValue``.
@@ -129,13 +134,18 @@ def build_filter(filter_json: str | None) -> tuple[Filter | None, str | None]:
     ``(None, warning)`` (search without a filter) so the caller can surface
     the warning.
     """
-    if not filter_json or not filter_json.strip():
+    if filter_json is None:
         return None, None
-    try:
-        parsed = json.loads(filter_json)
-    except json.JSONDecodeError as exc:
-        logger.warning("Invalid filter JSON %r (%s) — ignoring filter", filter_json, exc)
-        return None, WARN_INVALID_FILTER
+    if isinstance(filter_json, dict):
+        parsed = filter_json
+    elif isinstance(filter_json, str) and filter_json.strip():
+        try:
+            parsed = json.loads(filter_json)
+        except json.JSONDecodeError as exc:
+            logger.warning("Invalid filter JSON %r (%s) — ignoring filter", filter_json, exc)
+            return None, WARN_INVALID_FILTER
+    else:
+        return None, None
     if not isinstance(parsed, dict) or not parsed:
         return None, None
     conditions = []
