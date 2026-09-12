@@ -21,14 +21,14 @@ embedded by Ollama (`qwen3-embedding:8b`, 4096-dim) and stored in Qdrant
 
 | Tool | Params | Returns |
 |---|---|---|
-| `save_memory` | `text: str`, `metadata: str = "{}"` (JSON string), `collection: str = ""` | Confirmation with new point UUID + collection, e.g. `기억 저장 완료 (ID: <uuid>, 컬렉션: <name>)`. The saved text is also stored in the payload under `text`. |
+| `save_memory` | `text: str`, `metadata: str = "{}"` (JSON string), `collection: str = ""` | Confirmation with new point UUID + collection, e.g. `Memory saved (ID: <uuid>, collection: <name>)`. The saved text is also stored in the payload under `text`. |
 | `save_memories` | `texts: list[str]`, `metadata: str` (applied to all), `collection: str = ""` | Count + comma-separated UUIDs. Single Ollama batch call, single upsert. |
-| `search_memory` | `query: str`, `limit: int = 3`, `filter: str = ""` (payload-filter JSON), `collection: str = ""` | Lines like `- [ID: <uuid>] [유사도: 0.8421] 메타데이터: {"tags": [...]} | 내용: <text>`, best first. **Every hit includes the point ID and metadata** — enough to call `delete_memory`/`update_memory` directly from search output. Empty → `관련된 기억을 찾을 수 없습니다.` |
-| `update_memory` | `point_id: str`, `text: str`, `metadata: str = ""`, `collection: str = ""` | Re-embeds the new text and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata and replaces only the text; a JSON string replaces the whole payload metadata. Nonexistent ID → `갱신 실패: point_id …을(를) 찾을 수 없습니다.` (existence verified via retrieve first). |
+| `search_memory` | `query: str`, `limit: int = 3`, `filter: str = ""` (payload-filter JSON), `collection: str = ""` | Lines like `- [ID: <uuid>] [score: 0.8421] metadata: {"tags": [...]} | content: <text>`, best first. **Every hit includes the point ID and metadata** — enough to call `delete_memory`/`update_memory` directly from search output. Empty → `No matching memories found.` |
+| `update_memory` | `point_id: str`, `text: str`, `metadata: str = ""`, `collection: str = ""` | Re-embeds the new text and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata and replaces only the text; a JSON string replaces the whole payload metadata. Nonexistent ID → `Update failed: point_id … not found.` (existence verified via retrieve first). |
 | `delete_memory` | `point_id: str` (the UUID from save/search), `collection: str = ""` | Confirmation. Deletes the point permanently. |
 | `list_collections` | — | Collection names (comma-separated). |
 
-All tool text returns are Korean-language strings; scores are cosine
+All tool text returns are English-language strings; scores are cosine
 similarity, 0–1.
 
 ## Collections (`collection` param)
@@ -48,18 +48,20 @@ Empty string (default) uses the server-configured collection
   `collection_exists` first).
 - Dimension-mismatch fail-fast applies to ad-hoc collections too: saving
   into an existing collection built with a different model/vector size
-  exits the server with the Korean dimension-mismatch error, same as the
+  exits the server with the dimension-mismatch error, same as the
   default collection at startup.
 
 ## Payload filtering (search_memory `filter`)
 
 JSON string `{"field": value}`. List value → MatchAny (field contains any
 value); scalar → exact match; multiple fields AND-ed together.
-Invalid JSON → filter is ignored and a Korean warning line is appended to
-the returned string (e.g. `경고: filter JSON 파싱 실패, 필터 없이 검색함`),
+Invalid JSON → filter is ignored and a warning line is appended to
+the returned string (e.g. `Warning: failed to parse filter JSON; searching
+without a filter`),
 so the caller knows results are unfiltered. Same for invalid `metadata`
 on save: warning line in the return value
-(`경고: metadata JSON 파싱 실패, 빈 메타데이터로 저장됨`), empty metadata stored.
+(`Warning: failed to parse metadata JSON; saved with empty metadata`),
+empty metadata stored.
 
 ## Configuration
 
@@ -79,7 +81,7 @@ model). Run via `uv run mcp-ollama-qdrant` from the repo directory.
 
 - **Dimension mismatch fails fast.** If a collection already exists with a
   different vector size than the current `EMBED_MODEL` produces, the server
-  exits with a Korean-language error (and suggests: delete and recreate the
+  exits with a descriptive error (and suggests: delete and recreate the
   collection, or revert EMBED_MODEL). You cannot mix models in one
   collection. Same model change also requires re-embedding existing
   memories — old vectors stay valid only under the original model.

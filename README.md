@@ -43,8 +43,8 @@ by deleting and recreating the collection, or by switching back to the
 original embedding model.
 
 Invalid `metadata`/`filter` JSON is not silently ignored: the tool's return
-string includes a Korean warning line (e.g.
-`경고: metadata JSON 파싱 실패, 빈 메타데이터로 저장됨`).
+string includes a warning line (e.g.
+`Warning: failed to parse metadata JSON; saved with empty metadata`).
 
 ## Requirements
 
@@ -117,6 +117,12 @@ mcp:
 ```
 
 ## Testing
+
+Offline unit tests (Ollama and Qdrant are mocked — no live services needed):
+
+```bash
+uv run pytest tests/
+```
 
 End-to-end smoke test against live Ollama + Qdrant (saves a few memories,
 searches for them, prints similarity scores):
