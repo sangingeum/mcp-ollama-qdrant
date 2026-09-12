@@ -50,12 +50,24 @@ def ensure_collection_for(
         vector_size = len(embed_fn("dimension probe"))
         from qdrant_client.models import VectorParams
 
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-        )
-        logger.info("Created collection %r (dim=%d)", collection_name, vector_size)
-        return
+        try:
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
+        except Exception as exc:  # noqa: BLE001
+            # Multi-process race: another server process created the
+            # collection between our exists-check and create call.
+            # Re-verify dimension safety on the now-existing collection.
+            if not client.collection_exists(collection_name):
+                raise
+            logger.info(
+                "Collection %r created concurrently (%s) — verifying instead",
+                collection_name, exc,
+            )
+        else:
+            logger.info("Created collection %r (dim=%d)", collection_name, vector_size)
+            return
 
     info = client.get_collection(collection_name)
     vectors = info.config.params.vectors
