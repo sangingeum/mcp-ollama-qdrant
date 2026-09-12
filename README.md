@@ -6,16 +6,36 @@ An [MCP](https://modelcontextprotocol.io) server that gives your AI agent a
 - **Ollama** for embeddings (tested with `qwen3-embedding:8b`)
 - **Qdrant** as the vector store
 
-It exposes two tools over the stdio MCP transport:
+It exposes five tools over the stdio MCP transport:
 
 | Tool | Description |
 |---|---|
 | `save_memory(text, metadata)` | Embeds `text` via Ollama and upserts it into Qdrant. `metadata` is an optional JSON string stored alongside the vector. |
-| `search_memory(query, limit)` | Embeds `query` and returns the `limit` most similar stored memories with similarity scores. |
+| `save_memories(texts, metadata)` | Batch version: embeds a list of texts in one Ollama call and upserts them as a single batch. `metadata` applies to all documents. |
+| `search_memory(query, limit, filter)` | Embeds `query` and returns the `limit` most similar stored memories with similarity scores. Optional `filter` is a payload-filter JSON string (see below). |
+| `delete_memory(point_id)` | Deletes the stored memory (point) with the given ID. |
+| `list_collections()` | Lists all existing Qdrant collections. |
+
+### Payload filtering
+
+`search_memory` accepts an optional `filter` JSON string built from payload
+fields. List values become a `MatchAny` condition (matches if the payload
+field contains **any** of the values), scalar values become exact matches.
+Multiple conditions are AND-ed together:
+
+```json
+{"tags": ["x"]}                      // payload.tags contains "x"
+{"source": "doc1"}                   // exact match
+{"tags": ["a", "b"], "source": "s"}  // AND of MatchAny + match
+```
 
 On startup the server connects to Ollama and Qdrant and creates the collection
 automatically if it does not exist (cosine distance, dimension probed from the
-embedding model).
+embedding model). If the collection **already exists** with a different vector
+dimension than the current `EMBED_MODEL` produces, the server fails fast with
+a clear error instead of silently storing corrupt vectors — fix it by deleting
+and recreating the collection, or by switching back to the original embedding
+model.
 
 ## Requirements
 

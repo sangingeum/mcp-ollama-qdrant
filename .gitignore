@@ -25,3 +25,5 @@ venv/
 # OS
 .DS_Store
 .env
+test_stderr.log
+mismatch_stderr.log
