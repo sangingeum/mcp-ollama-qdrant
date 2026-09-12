@@ -43,8 +43,8 @@ Order: CLI flags > env vars > defaults.
 
 | Setting | CLI flag | Env var | Default |
 |---|---|---|---|
-| Ollama URL | `--ollama-url` | `OLLAMA_URL` | `http://192.168.1.103:11434` |
-| Qdrant URL | `--qdrant-url` | `QDRANT_URL` | `http://192.168.1.105:6333` |
+| Ollama URL | `--ollama-url` | `OLLAMA_URL` | `http://192.168.X.X:11434` |
+| Qdrant URL | `--qdrant-url` | `QDRANT_URL` | `http://192.168.X.X:6333` |
 | Embed model | `--embed-model` | `EMBED_MODEL` | `qwen3-embedding:8b` |
 | Collection | `--collection` | `COLLECTION_NAME` | `agent_scenarios` |
 
@@ -64,8 +64,8 @@ model). Run via `uv run mcp-ollama-qdrant` from the repo directory.
   warning if a filter unexpectedly matches nothing. Non-dict JSON also becomes
   empty metadata.
 - **First-index latency**: the startup collection-creation probes the model
-  with a real embed call; on a CPU-hosted 8B model this takes seconds, and
-  every `save/search_memory` pays one ~1–6 s embedding round trip per call.
+  with a real embed call, and every `save/search_memory` pays one embedding
+  round trip per call (~0.8 s GPU-hosted / ~6 s CPU-hosted, 8B model).
   Batch saves (`save_memories`) amortize this. Design waits accordingly.
 - Every save stores the full text inside the payload — search results include
   the text, no follow-up fetch needed.
