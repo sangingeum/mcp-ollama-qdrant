@@ -6,15 +6,19 @@ An [MCP](https://modelcontextprotocol.io) server that gives your AI agent a
 - **Ollama** for embeddings (tested with `qwen3-embedding:8b`)
 - **Qdrant** as the vector store
 
-It exposes five tools over the stdio MCP transport:
+It exposes six tools over the stdio MCP transport:
 
 | Tool | Description |
 |---|---|
-| `save_memory(text, metadata)` | Embeds `text` via Ollama and upserts it into Qdrant. `metadata` is an optional JSON string stored alongside the vector. |
-| `save_memories(texts, metadata)` | Batch version: embeds a list of texts in one Ollama call and upserts them as a single batch. `metadata` applies to all documents. |
-| `search_memory(query, limit, filter)` | Embeds `query` and returns the `limit` most similar stored memories with similarity scores. Optional `filter` is a payload-filter JSON string (see below). |
-| `delete_memory(point_id)` | Deletes the stored memory (point) with the given ID. |
+| `save_memory(text, metadata, collection)` | Embeds `text` via Ollama and upserts it into Qdrant. `metadata` is an optional JSON string stored alongside the vector. Optional `collection` targets a specific collection (created on the fly if missing; empty = server default). |
+| `save_memories(texts, metadata, collection)` | Batch version: embeds a list of texts in one Ollama call and upserts them as a single batch. `metadata` applies to all documents. |
+| `search_memory(query, limit, filter, collection)` | Embeds `query` and returns the `limit` most similar stored memories — each hit includes its point **ID**, similarity **score**, **metadata**, and text, so you can `delete_memory`/`update_memory` straight from search output. Optional `filter` is a payload-filter JSON string (see below). |
+| `update_memory(point_id, text, metadata, collection)` | Re-embeds `text` and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata; a JSON string replaces it. Nonexistent IDs return an error. |
+| `delete_memory(point_id, collection)` | Deletes the stored memory (point) with the given ID. |
 | `list_collections()` | Lists all existing Qdrant collections. |
+
+Every data tool takes an optional `collection` string; an empty value uses
+the server-configured collection (`--collection` / `COLLECTION_NAME`).
 
 ### Payload filtering
 
@@ -31,11 +35,16 @@ Multiple conditions are AND-ed together:
 
 On startup the server connects to Ollama and Qdrant and creates the collection
 automatically if it does not exist (cosine distance, dimension probed from the
-embedding model). If the collection **already exists** with a different vector
-dimension than the current `EMBED_MODEL` produces, the server fails fast with
-a clear error instead of silently storing corrupt vectors — fix it by deleting
-and recreating the collection, or by switching back to the original embedding
-model.
+embedding model). If a collection **already exists** with a different vector
+dimension than the current `EMBED_MODEL` produces — whether the default
+collection at startup or an ad-hoc one named in a tool call — the server fails
+fast with a clear error instead of silently storing corrupt vectors — fix it
+by deleting and recreating the collection, or by switching back to the
+original embedding model.
+
+Invalid `metadata`/`filter` JSON is not silently ignored: the tool's return
+string includes a Korean warning line (e.g.
+`경고: metadata JSON 파싱 실패, 빈 메타데이터로 저장됨`).
 
 ## Requirements
 
