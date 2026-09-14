@@ -23,7 +23,7 @@ embedded by Ollama (`qwen3-embedding:8b`, 4096-dim) and stored in Qdrant
 |---|---|---|
 | `save_memory` | `text: str`, `metadata: str \| object = "{}"`, `collection: str = ""` | Confirmation with new point UUID + collection, e.g. `Memory saved (ID: <uuid>, collection: <name>)`. The saved text is also stored in the payload under `text`. |
 | `save_memories` | `texts: list[str]`, `metadata: str \| object` (applied to all), `collection: str = ""` | Count + comma-separated UUIDs. Single Ollama batch call, single upsert. |
-| `search_memory` | `query: str`, `limit: int = 3`, `filter: str \| object = ""` (payload filter), `collection: str = ""` | Lines like `- [ID: <uuid>] [score: 0.8421] metadata: {"tags": [...]} | content: <text>`, best first. **Every hit includes the point ID and metadata** — enough to call `delete_memory`/`update_memory` directly from search output. Empty → `No matching memories found.` |
+| `search_memory` | `query: str`, `limit: int = 3`, `filter: str \| object = ""` (payload filter), `collection: str = ""`, `project: str = ""` (project-scoped convenience) | Lines like `- [ID: <uuid>] [score: 0.8421] metadata: {"tags": [...]} | content: <text>`, best first. **Every hit includes the point ID and metadata** — enough to call `delete_memory`/`update_memory` directly from search output. Empty → `No matching memories found.` |
 | `update_memory` | `point_id: str`, `text: str \| None = None`, `metadata: str \| object = ""`, `collection: str = ""` | Re-embeds the new text and overwrites the point in place (same ID). Empty `metadata` keeps the existing payload metadata and replaces only the text; a JSON object or string replaces the whole payload metadata. `text=None` (or blank) with a `metadata` value updates ONLY metadata — the stored text and vector are kept, no re-embedding (no Ollama call). Passing neither text nor metadata → `Error: nothing to update…`. Nonexistent ID → `Update failed: point_id … not found.` (existence verified via retrieve first). |
 | `delete_memory` | `point_id: str` (the UUID from save/search), `collection: str = ""` | Confirmation `Memory deleted (ID: …)`. Deletes the point permanently. Nonexistent ID → `Error: point_id … not found` (existence verified via retrieve first, no false success). |
 | `list_collections` | — | Collection names (comma-separated). |
@@ -50,6 +50,33 @@ Empty string (default) uses the server-configured collection
   into an existing collection built with a different model/vector size
   exits the server with the dimension-mismatch error, same as the
   default collection at startup.
+
+## Memory metadata convention (always populate on save)
+
+When saving project knowledge, ALWAYS attach these metadata fields (all
+optional but `project` and `type` strongly expected) so project-scoped
+search works:
+
+```json
+{
+    "project": "my-project",
+    "path": "/path/to/project",
+    "type": "architecture",
+    "tags": ["cpp", "network"],
+    "importance": 0.8,
+    "created_at": "2026-09-14T00:00:00Z",
+    "updated_at": "2026-09-14T00:00:00Z"
+}
+```
+
+- Useful `type` values: `project`, `architecture`, `debugging`, `decision`,
+  `user_preference`, `temporary`.
+- On `update_memory` metadata is replaced wholesale — re-supply the full set
+  (including refreshed `updated_at`) rather than a partial patch.
+- `search_memory` accepts a `project` param that scopes results to one
+  project (equivalent to `filter={"project": ...}`); keep saves and searches
+  consistent — a search scoped to `project` will not see memories saved
+  without a `project` field.
 
 ## Payload filtering (search_memory `filter`)
 

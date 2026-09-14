@@ -172,6 +172,27 @@ def test_search_filter_as_dict(env):
     assert "No matching memories found." in out2
 
 
+def test_search_project_scoping(env):
+    """project= ANDs an exact 'project' condition with any filter."""
+    s.save_memory("alpha note", {"project": "alpha", "type": "decision"})
+    s.save_memory("beta note", {"project": "beta", "type": "decision"})
+    out = s.search_memory("note", project="alpha")
+    assert "alpha note" in out and "beta note" not in out
+    out2 = s.search_memory("note", project="beta")
+    assert "beta note" in out2 and "alpha note" not in out2
+    # Unscoped search still sees both.
+    out3 = s.search_memory("note")
+    assert "alpha note" in out3 and "beta note" in out3
+
+
+def test_search_project_combined_with_filter(env):
+    s.save_memory("alpha arch", {"project": "alpha", "type": "architecture"})
+    s.save_memory("alpha debug", {"project": "alpha", "type": "debugging"})
+    out = s.search_memory("alpha", project="alpha",
+                          filter={"type": "architecture"})
+    assert "alpha arch" in out and "alpha debug" not in out
+
+
 def test_update_metadata_as_dict(env):
     fq, _ = env
     saved = s.save_memory("upd dict doc", {"v": 1})

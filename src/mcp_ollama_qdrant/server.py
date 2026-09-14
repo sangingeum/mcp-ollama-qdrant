@@ -13,7 +13,7 @@ import sys
 import uuid
 from typing import Any
 
-from qdrant_client.models import PointStruct
+from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct
 
 from mcp.server.fastmcp import FastMCP
 
@@ -110,7 +110,8 @@ def save_memories(texts: list[str], metadata: str | dict[str, Any] = "{}", colle
 
 
 @mcp.tool()
-def search_memory(query: str, limit: int = 3, filter: str | dict[str, Any] = "", collection: str = "") -> str:
+def search_memory(query: str, limit: int = 3, filter: str | dict[str, Any] = "",
+                  collection: str = "", project: str = "") -> str:
     """Search the vector DB for past documents/scenarios semantically similar to a query.
 
     filter is an optional payload filter, as a JSON string or object (e.g.
@@ -118,10 +119,19 @@ def search_memory(query: str, limit: int = 3, filter: str | dict[str, Any] = "",
     List values use MatchAny, scalars use exact match, and multiple
     conditions are AND-ed. On parse failure the search runs without a filter
     and a warning is returned alongside the results.
+    project (optional) is a thin convenience for project-scoped memory: it
+    ANDs an exact-match condition on the payload 'project' field on top of
+    any filter — equivalent to filter={"project": ...} (metadata convention
+    in SKILL.md). Pass project on save_memory too, or results will not scope.
     If collection is given, the search runs there (default: the
     server-configured collection).
     """
     qdrant_filter, warning = build_filter(filter)
+    if project:
+        proj_cond = FieldCondition(key="project", match=MatchValue(value=project))
+        must: list[Any] = list(qdrant_filter.must or []) if qdrant_filter else []
+        must.append(proj_cond)
+        qdrant_filter = Filter(must=must)
     try:
         name = collection if collection and collection.strip() else COLLECTION_NAME
         query_vector = embed(query)
